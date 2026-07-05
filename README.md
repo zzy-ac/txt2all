@@ -4,7 +4,7 @@
 
 ~~txt2epub程序的cf wrokers实现，~~
 
-txt小说格式转换工具，可以在网页自动将txt格式文本分章节、获取起点封面或自行上传封面之后生成对应的小说格式，包括epub(通用)、kepub(kobo)、kfx/azw3(kindle)
+txt小说格式转换工具，可以在网页自动将txt格式文本分章节、获取起点封面或自行上传封面之后生成对应的小说格式，包括epub(通用)、kepub(kobo)、kfx(kindle)
 
 ## 部署方式
 

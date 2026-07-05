@@ -1,36 +1,15 @@
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
-    // 封面 API
-    if (url.pathname === '/api/qidian-cover') {
-      return handleCover(url);
-    }
-
-    // 对于已知的静态资源或非 HTML 请求，直接交给 Pages 的静态文件服务
-    // 这样 pkg/ 下的文件就能被正常加载
-    if (
-      url.pathname.startsWith('/pkg/') ||
-      url.pathname === '/favicon.ico' ||
-      url.pathname.endsWith('.wasm') ||
-      url.pathname.endsWith('.js') && url.pathname !== '/'  // 避免覆盖主页面（但主页由 HTML 字符串提供）
-    ) {
-      // 如果有 Pages 的 ASSETS 服务，使用它；否则尝试直接 fetch 静态文件（用于开发环境）
-      if (env.ASSETS) {
-        return env.ASSETS.fetch(request);
-      }
-      // 备用：直接传递请求到当前域（仅当部署在 Pages 时有效）
+    if (url.pathname === '/api/qidian-cover') return handleCover(url);
+    if (url.pathname.startsWith('/pkg/') || url.pathname.endsWith('.wasm') || (url.pathname.endsWith('.js') && url.pathname !== '/')) {
+      if (env.ASSETS) return env.ASSETS.fetch(request);
       return fetch(request);
     }
-
-    // 其他所有请求返回主页面 HTML
-    return new Response(HTML, {
-      headers: { 'Content-Type': 'text/html; charset=utf-8' },
-    });
+    return new Response(HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   },
 };
 
-// 以下是封面处理、HTML 字符串等，与之前完全相同
 async function handleCover(url) {
   const bookname = url.searchParams.get('bookname');
   if (!bookname) return jsonResponse({ error: '缺少书名参数' }, 400);
@@ -53,16 +32,13 @@ function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } });
 }
 
-const favicon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="80" font-size="80">📖</text></svg>`;
-
-// HTML 保持不变，但确保 import 路径正确（已是 './pkg/boko.js'）
 const HTML = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>TXT转电子书</title>
-<link rel="icon" href="/favicon.ico" type="image/svg+xml">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📖</text></svg>">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f5f7fb;padding:20px}
@@ -110,7 +86,7 @@ input[type="text"]:focus{outline:none;border-color:#3b82f6}
 <body>
 <div class="container">
 <h1>📖 TXT转电子书</h1>
-<p class="subtitle">自动识别卷/章 · 多级标题 · 支持 EPUB / KEPUB / KFX / AZW3</p>
+<p class="subtitle">自动识别卷/章 · 多级标题 · 支持 EPUB / KEPUB / KFX</p>
 <div class="upload-box" id="uploadBox">
 <div style="font-size:36px;margin-bottom:8px">📂</div>
 <div style="font-weight:500">点击或拖拽上传 TXT 文件</div>
@@ -126,7 +102,6 @@ input[type="text"]:focus{outline:none;border-color:#3b82f6}
 <button class="format-btn active" data-format="epub">📱 EPUB</button>
 <button class="format-btn" data-format="kepub">📗 KEPUB</button>
 <button class="format-btn" data-format="kfx">📖 KFX</button>
-<button class="format-btn" data-format="azw3">📘 AZW3</button>
 </div>
 <div class="cover-row">
 <div class="cover-preview" id="coverPreview">📷</div>
@@ -150,18 +125,13 @@ input[type="text"]:focus{outline:none;border-color:#3b82f6}
 <button class="btn btn-primary" id="convertBtn">🚀 生成并下载</button>
 <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
 <div class="status" id="statusMsg"></div>
-<div class="footer-note">KFX/AZW3 由 <a href="https://github.com/zacharydenton/boko" target="_blank">boko</a> 提供转换支持</div>
+<div class="footer-note">KFX 由 <a href="https://github.com/zacharydenton/boko" target="_blank">boko</a> 提供转换支持</div>
 </div>
 <script type="module">
-import init, { epub_to_kfx, epub_to_azw3 } from './pkg/boko.js';
+import init, { epub_to_kfx } from './pkg/boko.js';
 
 let bokoReady = false;
-try {
-    await init();
-    bokoReady = true;
-} catch (e) {
-    console.warn('boko WASM 加载失败，KFX/AZW3 转换不可用', e);
-}
+try { await init(); bokoReady = true; } catch (e) { console.warn('boko 加载失败，KFX 不可用'); }
 
 var fc='',fn='',cb=null,pvs={volumes:[]},fmt='epub';
 var ub=document.getElementById('uploadBox'),fi=document.getElementById('fileInput'),bt=document.getElementById('bookTitle'),ba=document.getElementById('bookAuthor'),
@@ -221,31 +191,75 @@ catch(e){ss('封面获取失败: '+e.message,1);sp(0)}finally{fcb.disabled=false
 async function gE(m,s,f){if(typeof JSZip==='undefined'){await new Promise(function(r,j){var sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';sc.onload=r;sc.onerror=function(){j(new Error('JSZip加载失败'))};document.head.appendChild(sc)})}
 var z=new JSZip(),kp=f==='kepub';
 z.file('mimetype','application/epub+zip',{compression:'STORE'});
-z.folder('META-INF').file('container.xml','<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
-var o=z.folder('OEBPS'),co={compression:'DEFLATE',compressionOptions:{level:9}};
-var css='body{font-family:"Songti SC","Noto Serif CJK SC",serif;line-height:1.8;margin:0;padding:0}h1{text-align:center;font-size:1.5em;margin:2em 0 1em;page-break-before:always}h2{text-align:center;font-size:1.2em;margin:1.5em 0 .8em;page-break-before:always}p{text-indent:2em;margin:.3em 0}img.cover{max-width:100%;height:auto;display:block;margin:0 auto}';
-if(kp){css+='div.koboSpan{display:inline}span.koboHighlight{background:transparent!important}';o.file('style.kepub.css',css,co)}else{o.file('style.css',css,co)}
-var ch='';if(cb){var ext=(cb.type||'image/jpeg').split('/')[1]||'jpg';ch='images/cover.'+ext;o.folder('images').file('cover.'+ext,cb,co)}
-var pgs=[],np=[],po=0,csHref=kp?'style.kepub.css':'style.css';
-if(ch){var coverHtml='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>封面</title><link rel="stylesheet" href="'+csHref+'" type="text/css"/></head><body><div style="text-align:center;padding:2em"><img class="cover" src="'+ch+'" alt="封面"/></div></body></html>';
-o.file('cover.xhtml',coverHtml,co);pgs.push({id:'cover',href:'cover.xhtml',title:'封面'})}
-var th='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>目录</title><link rel="stylesheet" href="'+csHref+'" type="text/css"/></head><body><h2>目录</h2><nav'+(kp?' epub:type="toc"':'')+'>';
-s.volumes.forEach(function(v,vi){var vid='v'+vi;th+='<p style="text-indent:0;font-weight:bold;margin:.5em 0"><a href="'+vid+'.xhtml">'+eH(v.title)+'</a></p>';
-v.chapters.forEach(function(c,ci){var cid='c'+vi+'_'+ci;th+='<p style="text-indent:1.5em;font-size:.9em;margin:.2em 0"><a href="'+cid+'.xhtml">'+eH(c.title)+'</a></p>'})});th+='</nav></body></html>';
-o.file('toc.xhtml',th,co);pgs.push({id:'toc',href:'toc.xhtml',title:'目录'});
-s.volumes.forEach(function(v,vi){var vid='v'+vi;
-o.file(vid+'.xhtml','<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>'+eH(v.title)+'</title><link rel="stylesheet" href="'+csHref+'" type="text/css"/></head><body><h1>'+eH(v.title)+'</h1></body></html>',co);pgs.push({id:vid,href:vid+'.xhtml',title:v.title});po++;
-np.push('<navPoint id="nav'+vid+'" playOrder="'+po+'"><navLabel><text>'+eX(v.title)+'</text></navLabel><content src="'+vid+'.xhtml"/></navPoint>');
-v.chapters.forEach(function(c,ci){var cid='c'+vi+'_'+ci,paras=c.content.split(/\\n+/).filter(function(l){return l.trim()}).map(function(l){return'<p>'+(kp?'<span class="koboSpan">'+eH(l.trim())+'</span>':eH(l.trim()))+'</p>'}).join('');
-o.file(cid+'.xhtml','<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>'+eH(c.title)+'</title><link rel="stylesheet" href="'+csHref+'" type="text/css"/></head><body><h2>'+eH(c.title)+'</h2>'+paras+'</body></html>',co);pgs.push({id:cid,href:cid+'.xhtml',title:c.title});po++;
-np.push('<navPoint id="nav'+cid+'" playOrder="'+po+'"><navLabel><text>'+eX(v.title)+' - '+eX(c.title)+'</text></navLabel><content src="'+cid+'.xhtml"/></navPoint>')})});
-var uid='urn:uuid:'+crypto.randomUUID(),mn='',spn='';pgs.forEach(function(p){mn+='<item id="'+p.id+'" href="'+p.href+'" media-type="application/xhtml+xml"/>';spn+='<itemref idref="'+p.id+'"/>'});
-if(ch){mn+='<item id="cover-image" href="'+ch+'" media-type="'+(cb?cb.type:'image/jpeg')+'" properties="cover-image"/>'}mn+='<item id="css" href="'+csHref+'" media-type="text/css"/>';
-var opf='<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" unique-identifier="book-id" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>'+eX(m.title)+'</dc:title><dc:creator>'+eX(m.author)+'</dc:creator><dc:language>zh-CN</dc:language><dc:identifier id="book-id">'+uid+'</dc:identifier><meta name="cover" content="cover-image"/>';
-if(kp){opf+='<meta property="rendition:spread">auto</meta>'}opf+='</metadata><manifest>'+mn+'</manifest><spine'+ (kp?' page-progression-direction="default"':'') +'>'+spn+'</spine></package>';
-o.file('content.opf',opf,co);
-var ncx='<?xml version="1.0" encoding="UTF-8"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="'+uid+'"/></head><docTitle><text>'+eX(m.title)+'</text></docTitle><navMap>'+np.join('')+'</navMap></ncx>';
-o.file('toc.ncx',ncx,co);
+z.folder('META-INF').file('container.xml','<?xml version="1.0" encoding="UTF-8"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="EPUB/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>');
+var epub=z.folder('EPUB'),co={compression:'DEFLATE',compressionOptions:{level:9}};
+var stylesFolder=epub.folder('styles'),textFolder=epub.folder('text'),mediaFolder=epub.folder('media');
+var css='body{padding:3% 2%;margin-top:3%;margin-bottom:3%;margin-left:1%;margin-right:1%;line-height:1em;text-align:justify}h1,h2{margin:1em 0 5em;line-height:120%;text-align:left;font-family:STSong,serif,"Times New Roman","方正书宋","宋体","FZPingXianYaSongS-R-GB","zw";padding:15px 12px 1em 5px;border-style:none none dotted none;border-width:0 0 1px 0;page-break-before:always}h1.title{text-align:center}p.author{text-align:center}p{margin:.5em 0;line-height:1em;text-indent:2em}hr{border:0;background-color:#BEBEBE;height:1.5px;margin:2% 0}img.cover{max-width:100%;height:auto;display:block;margin:0 auto}';
+if(kp){css+='div.koboSpan{display:inline}span.koboHighlight{background:transparent!important}';stylesFolder.file('style.kepub.css',css,co)}else{stylesFolder.file('style.css',css,co)}
+var csHref=kp?'styles/style.kepub.css':'styles/style.css';
+
+var coverHref='',coverId='';
+if(cb){var ext=(cb.type||'image/jpeg').split('/')[1]||'jpg';coverHref='media/cover.'+ext;coverId='cover-image';mediaFolder.file('cover.'+ext,cb,co)}
+
+var pages=[], navMap=[], chNum=0;
+function pad(n){return n<10?'00'+n:(n<100?'0'+n:''+n)}
+
+if(coverHref){
+  var coverHtml='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>封面</title><link rel="stylesheet" href="'+csHref+'" type="text/css"/></head><body><div style="text-align:center;padding:2em"><img class="cover" src="'+coverHref+'" alt="封面"/></div></body></html>';
+  var coverFile='cover.xhtml';
+  textFolder.file(coverFile,coverHtml,co);
+  pages.push({id:'cover',href:'text/'+coverFile,title:'封面'});
+}
+
+s.volumes.forEach(function(volume,vIndex){
+  chNum++; var volId='vol-'+vIndex, volFile='ch'+pad(chNum)+'.xhtml';
+  var volHtml='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>'+eH(volume.title)+'</title><link rel="stylesheet" href="../'+csHref+'" type="text/css"/></head><body><h1 id="'+volId+'">'+eH(volume.title)+'</h1></body></html>';
+  textFolder.file(volFile,volHtml,co);
+  pages.push({id:'vol'+vIndex,href:'text/'+volFile,title:volume.title});
+  var volNav={id:'nav-vol'+vIndex,text:volume.title,src:'text/'+volFile+'#'+volId,children:[]};
+
+  volume.chapters.forEach(function(chapter,cIndex){
+    chNum++; var chId='ch-'+vIndex+'-'+cIndex, chFile='ch'+pad(chNum)+'.xhtml';
+    var paras=chapter.content.split(/\\n+/).filter(function(l){return l.trim()}).map(function(l){return'<p>'+(kp?'<span class="koboSpan">'+eH(l.trim())+'</span>':eH(l.trim()))+'</p>'}).join('');
+    var chHtml='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>'+eH(chapter.title)+'</title><link rel="stylesheet" href="../'+csHref+'" type="text/css"/></head><body><h2 id="'+chId+'">'+eH(chapter.title)+'</h2>'+paras+'</body></html>';
+    textFolder.file(chFile,chHtml,co);
+    pages.push({id:'ch'+vIndex+'_'+cIndex,href:'text/'+chFile,title:chapter.title});
+    volNav.children.push({id:'nav-ch'+vIndex+'-'+cIndex,text:chapter.title,src:'text/'+chFile+'#'+chId});
+  });
+  navMap.push(volNav);
+});
+
+// nav.xhtml 放在 EPUB/ 根下，CSS 路径为 styles/style.css
+var navHtml='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目录</title><link rel="stylesheet" href="'+csHref+'" type="text/css"/></head><body><nav epub:type="toc"><h1>目录</h1><ol>';
+navMap.forEach(function(vol){
+  navHtml+='<li><a href="'+vol.src+'">'+eH(vol.text)+'</a><ol>';
+  vol.children.forEach(function(ch){navHtml+='<li><a href="'+ch.src+'">'+eH(ch.text)+'</a></li>'});
+  navHtml+='</ol></li>';
+});
+navHtml+='</ol></nav></body></html>';
+epub.file('nav.xhtml',navHtml,co);
+pages.push({id:'nav',href:'nav.xhtml',title:'目录'});
+
+var uid='urn:uuid:'+crypto.randomUUID();
+var manifest='', spine='';
+pages.forEach(function(p){manifest+='<item id="'+p.id+'" href="'+p.href+'" media-type="application/xhtml+xml"/>'; spine+='<itemref idref="'+p.id+'"/>'});
+if(coverHref){manifest+='<item id="cover-image" href="'+coverHref+'" media-type="'+(cb?cb.type:'image/jpeg')+'" properties="cover-image"/>'}
+manifest+='<item id="css" href="'+csHref+'" media-type="text/css"/>';
+var opf='<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" unique-identifier="book-id" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>'+eX(m.title)+'</dc:title><dc:creator>'+eX(m.author)+'</dc:creator><dc:language>zh-CN</dc:language><dc:identifier id="book-id">'+uid+'</dc:identifier><meta name="cover" content="cover-image"/>'+(kp?'<meta property="rendition:spread">auto</meta>':'')+'</metadata><manifest>'+manifest+'</manifest><spine>'+(kp?'<spine page-progression-direction="default">':'<spine>')+spine+'</spine></package>';
+epub.file('content.opf',opf,co);
+
+var ncx='<?xml version="1.0" encoding="UTF-8"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head><meta name="dtb:uid" content="'+uid+'"/><meta name="dtb:depth" content="1"/><meta name="dtb:totalPageCount" content="0"/><meta name="dtb:maxPageNumber" content="0"/>'+(coverHref?'<meta name="cover" content="cover-image"/>':'')+'</head><docTitle><text>'+eX(m.title)+'</text></docTitle><navMap>';
+var npId=0;
+navMap.forEach(function(vol){
+  npId++; ncx+='<navPoint id="navPoint-'+npId+'" playOrder="'+npId+'"><navLabel><text>'+eX(vol.text)+'</text></navLabel><content src="'+vol.src+'"/>';
+  vol.children.forEach(function(ch){
+    npId++; ncx+='<navPoint id="navPoint-'+npId+'" playOrder="'+npId+'"><navLabel><text>'+eX(ch.text)+'</text></navLabel><content src="'+ch.src+'"/></navPoint>';
+  });
+  ncx+='</navPoint>';
+});
+ncx+='</navMap></ncx>';
+epub.file('toc.ncx',ncx,co);
+
 return await z.generateAsync({type:'blob',mimeType:'application/epub+zip',compression:'DEFLATE',compressionOptions:{level:9,memLevel:9,windowBits:15},streamFiles:true,platform:'UNIX'})}
 
 ub.addEventListener('click',function(){fi.click()});
@@ -273,16 +287,12 @@ var tc=pvs.volumes.reduce(function(s,v){return s+v.chapters.length},0);
 var fext='.epub', flbl='EPUB';
 if(fmt==='kepub'){fext='.kepub.epub';flbl='KEPUB'}
 else if(fmt==='kfx'){fext='.kfx';flbl='KFX'}
-else if(fmt==='azw3'){fext='.azw3';flbl='AZW3'}
 ss('正在生成'+flbl+' ('+pvs.volumes.length+'卷 '+tc+'章)...');sp(20);cvb.disabled=true;
 try{
   var eb=await gE({title:t,author:a},pvs,fmt);
-  // boko 转换
-  if(bokoReady && (fmt==='kfx' || fmt==='azw3')){
+  if(bokoReady && fmt==='kfx'){
     var inputData = new Uint8Array(await eb.arrayBuffer());
-    var outputData;
-    if(fmt==='kfx') outputData = epub_to_kfx(inputData);
-    else outputData = epub_to_azw3(inputData);
+    var outputData = epub_to_kfx(inputData);
     eb = new Blob([outputData], {type:'application/octet-stream'});
   }
   sp(90);var u=URL.createObjectURL(eb),d=document.createElement('a');d.href=u;d.download=t.replace(/[\\\\/:*?"<>|]/g,'_')+fext;document.body.appendChild(d);d.click();document.body.removeChild(d);URL.revokeObjectURL(u);sp(100);ss('✅ '+flbl+'生成成功！'+pvs.volumes.length+'卷 '+tc+'章');setTimeout(function(){sp(0)},1500)}

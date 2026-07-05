@@ -1,6 +1,6 @@
 # txt2epub-cfwroker
 
-txt2epub程序的cf wrokers实现，可以在网页自动将txt格式文本分章节、获取起点封面或自行上传封面之后生成对应的epub格式
+txt2epub程序的cf wrokers实现，可以在网页自动将txt格式文本分章节、获取起点封面或自行上传封面之后生成对应的epub、kepub格式
 
 ## 部署方式
 

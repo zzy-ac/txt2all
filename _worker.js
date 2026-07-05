@@ -199,22 +199,29 @@ var stylesFolder=epub.folder('styles'),textFolder=epub.folder('text'),mediaFolde
 var css='body{padding:3% 2%;margin-top:3%;margin-bottom:3%;margin-left:1%;margin-right:1%;line-height:1em;text-align:justify}h1,h2{margin:1em 0 5em;line-height:120%;text-align:left;font-family:STSong,serif,"Times New Roman","方正书宋","宋体","FZPingXianYaSongS-R-GB","zw";padding:15px 12px 1em 5px;border-style:none none dotted none;border-width:0 0 1px 0;page-break-before:always}h1.title{text-align:center}p.author{text-align:center}p{margin:.5em 0;line-height:1em;text-indent:2em}hr{border:0;background-color:#BEBEBE;height:1.5px;margin:2% 0}img.cover{max-width:100%;height:auto;display:block;margin:0 auto}';
 if(kp){css+='div.koboSpan{display:inline}span.koboHighlight{background:transparent!important}';stylesFolder.file('style.kepub.css',css,co)}else{stylesFolder.file('style.css',css,co)}
 var csHref=kp?'styles/style.kepub.css':'styles/style.css';
-var coverHref='',coverMediaType='';
+
+// 处理封面图片：强制使用 .jpg 扩展名，MIME 类型设为 image/jpeg
+var coverHref='', coverMediaType='';
 if(cb){
-  var ext=(cb.type||'image/jpeg').split('/')[1]||'jpg';
-  coverHref='media/cover.'+ext;
-  coverMediaType=cb.type||'image/jpeg';
-  // ★ 封面图片必须使用 STORE 压缩，否则 Plasma 无法直接读取
-  mediaFolder.file('cover.'+ext,cb,{compression:'STORE'});
+  var ext = 'jpg';  // 统一使用 .jpg，确保 Plasma 识别
+  coverHref = 'media/cover.' + ext;
+  coverMediaType = 'image/jpeg';   // 强制设为 image/jpeg
+  // 封面图片使用 STORE 压缩，避免压缩破坏可直接读取性
+  mediaFolder.file('cover.' + ext, cb, { compression: 'STORE' });
 }
+
 var pgs=[],navMap=[],chNum=0;
 function pad(n){return n<10?'00'+n:(n<100?'0'+n:''+n)}
+
+// 添加封面页面（如果存在封面图片）
 if(coverHref){
-  var coverImgSrc = '../' + coverHref;  // text/ 下引用 media/ 图片
+  // 图片在 media/，cover.xhtml 在 text/，因此需要 ../media/cover.jpg
+  var coverImgSrc = '../' + coverHref;
   var coverHtml='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>封面</title><link rel="stylesheet" href="../'+csHref+'" type="text/css"/></head><body><div style="text-align:center;padding:2em"><img class="cover" src="'+coverImgSrc+'" alt="封面"/></div></body></html>';
   textFolder.file('cover.xhtml',coverHtml,co);
   pgs.push({id:'cover',href:'text/cover.xhtml',title:'封面'});
 }
+
 s.volumes.forEach(function(volume,vIndex){
   chNum++; var volId='vol-'+vIndex, volFile='ch'+pad(chNum)+'.xhtml';
   var volHtml='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml"><head><title>'+eH(volume.title)+'</title><link rel="stylesheet" href="../'+csHref+'" type="text/css"/></head><body><h1 id="'+volId+'">'+eH(volume.title)+'</h1></body></html>';
@@ -231,6 +238,8 @@ s.volumes.forEach(function(volume,vIndex){
   });
   navMap.push(volNav);
 });
+
+// nav.xhtml 放在 EPUB/ 根
 var navHtml='<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>目录</title><link rel="stylesheet" href="'+csHref+'" type="text/css"/></head><body><nav epub:type="toc"><h1>目录</h1><ol>';
 navMap.forEach(function(vol){
   navHtml+='<li><a href="'+vol.src+'">'+eH(vol.text)+'</a><ol>';
